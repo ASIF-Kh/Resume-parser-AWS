@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+
+{% block title %}Skills Visualization{% endblock %}
+
+{% block head %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<header class="mb-8">
+    <h1 class="text-4xl font-bold text-gray-900">Skills Visualization</h1>
+    <p class="text-lg text-gray-600">Top 15 skills across all candidate profiles.</p>
+</header>
+
+<section class="bg-white p-6 rounded-lg shadow-md" style="height: 65vh;">
+    <canvas id="skillsChart"></canvas>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const chartCanvas = document.getElementById('skillsChart');
+    if (!chartCanvas) return;
+    
+    const ctx = chartCanvas.getContext('2d');
+
+    fetch("{{ url_for('skills_data') }}")
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // This handles the case where the backend returns no data
+            if (!data || !data.labels || data.labels.length === 0) {
+                ctx.font = "16px Inter, sans-serif";
+                ctx.fillStyle = "#6b7280";
+                ctx.textAlign = "center";
+                ctx.fillText("Not enough skill data to generate a chart.", chartCanvas.width / 2, 50);
+                return;
+            }
+
+            // THIS IS THE COMPLETE CHART CONFIGURATION THAT WAS MISSING
+            new Chart(ctx, {
+                type: 'bar', // The type of chart
+                data: {
+                    // Use data from the /api/skills_data endpoint
+                    labels: data.labels.map(label => label.charAt(0).toUpperCase() + label.slice(1)),
+                    datasets: [{
+                        label: '# of Candidates with this Skill',
+                        data: data.data,
+                        backgroundColor: 'rgba(79, 70, 229, 0.6)', // Indigo color
+                        borderColor: 'rgba(79, 70, 229, 1)',
+                        borderWidth: 1,
+                        hoverBackgroundColor: 'rgba(79, 70, 229, 0.8)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    // 'y' axis makes the bar chart horizontal for better readability
+                    indexAxis: 'y', 
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                // Ensure only whole numbers are shown on the axis
+                                precision: 0 
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false // Hide the legend as it's not needed for one dataset
+                        },
+                        title: {
+                            display: true,
+                            text: 'Top 15 Skills Distribution',
+                            font: { size: 18, family: "'Inter', sans-serif" },
+                            padding: { top: 10, bottom: 20 }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching chart data:', error);
+            const ctx = document.getElementById('skillsChart').getContext('2d');
+            ctx.font = "16px Inter, sans-serif";
+            ctx.fillStyle = "#ef4444"; // Red for error
+            ctx.textAlign = "center";
+            ctx.fillText("Failed to load chart data.", ctx.canvas.width / 2, 50);
+        });
+});
+</script>
+{% endblock %}
