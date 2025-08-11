@@ -13,7 +13,7 @@ from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user
 )
-from werkzeug.security import generate_password_hash, check_password_hash
+
 from botocore.exceptions import ClientError
 
 # --- Environment Variable Loading ---
@@ -54,16 +54,16 @@ login_manager.login_message_category = "info"
 
 # --- User Model ---
 class User(UserMixin):
-    def __init__(self, username, password_hash):
+    def __init__(self, username, password):
         self.id = username
-        self.password_hash = password_hash
+        self.password = password
 
     @staticmethod
     def get(username):
         try:
             response = users_table.get_item(Key={'username': username})
             if 'Item' in response:
-                return User(username=response['Item']['username'], password_hash=response['Item']['password_hash'])
+                return User(username=response['Item']['username'], password=response['Item']['password'])
         except ClientError as e:
             print(f"Error getting user: {e}")
         return None
@@ -72,18 +72,6 @@ class User(UserMixin):
 def load_user(user_id):
     return User.get(user_id)
 
-# --- Command to Create a User ---
-@app.cli.command("create-user")
-def create_user():
-    import getpass
-    username = input("Enter admin username: ")
-    password = getpass.getpass("Enter password: ")
-    if password != getpass.getpass("Confirm password: "):
-        print("Passwords do not match."); return
-    if User.get(username):
-        print(f"User '{username}' already exists."); return
-    users_table.put_item(Item={'username': username, 'password_hash': generate_password_hash(password)})
-    print(f"Admin user '{username}' created successfully!")
 
 # --- Helper Functions ---
 def allowed_file(filename):
@@ -185,7 +173,7 @@ def login():
         return redirect(url_for('dashboard'))
     if request.method == 'POST':
         user = User.get(request.form.get('username'))
-        if user and check_password_hash(user.password_hash, request.form.get('password')):
+        if user and user.password == request.form.get('password').strip():
             login_user(user, remember=request.form.get('remember'))
             # Redirect to the dashboard after successful login
             return redirect(url_for('dashboard'))
